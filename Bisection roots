@@ -1,0 +1,115 @@
+function bisection_roots(f, x_range)
+    % Wrapper for executing the Bisection Method in the root-finder tool
+    % -------------------------------------------------------------------
+
+    fprintf('\n--- BISECTION METHOD CONFIGURATION ---\n');
+    step_size = input('Step size (e.g. 0.5): ');
+    tolerance = input('Tolerance (e.g. 1e-5): ');
+    max_iterations = input('Maximum number of iterations: ');
+
+    [found_roots, iteration_log] = scan_interval_bisection(f, x_range, step_size, tolerance, max_iterations);
+
+    if isempty(found_roots)
+        fprintf('\nNo roots found within [%g, %g] using the Bisection method.\n', x_range(1), x_range(2));
+    else
+        fprintf('\nRoots identified via Bisection:\n');
+        disp(found_roots');
+    end
+
+    show_bisection_iterations(iteration_log);
+    plot_bisection_results(f, x_range, found_roots);
+end
+
+% ------------ Internal Helper Functions ------------ %
+
+function [root_list, log_data] = scan_interval_bisection(f, interval, step, tol, max_iter)
+    % Search the interval in steps and apply Bisection where sign changes
+    start_x = interval(1); end_x = interval(2);
+    root_list = [];
+    log_data = [];
+
+    current = start_x;
+
+    while current < end_x
+        lower = current;
+        upper = min(current + step, end_x);
+        f_lower = f(lower);
+        f_upper = f(upper);
+
+        if f_lower * f_upper < 0
+            [root, steps] = run_bisection(f, lower, upper, tol, max_iter);
+            if ~any(abs(root_list - root) < tol)
+                root_list(end+1) = root;
+            end
+            log_data = [log_data; steps];
+        end
+
+        current = current + step;
+    end
+end
+
+function [root, iterations] = run_bisection(f, lower, upper, tol, max_iter)
+    % Apply the Bisection method to a single interval
+    iterations = [];
+    count = 0;
+
+    while (upper - lower) / 2 > tol && count < max_iter
+        midpoint = (lower + upper) / 2;
+        f_mid = f(midpoint);
+        f_low = f(lower);
+        f_up = f(upper);
+        count = count + 1;
+
+        iterations(end+1, :) = [count, lower, upper, midpoint, f_low, f_up, f_mid];
+
+        if f_low * f_mid < 0
+            upper = midpoint;
+        else
+            lower = midpoint;
+        end
+    end
+
+    root = (lower + upper) / 2;
+end
+
+function show_bisection_iterations(log)
+    % Display the iteration log in tabular format
+    if isempty(log)
+        fprintf('\nNo iteration data available.\n');
+        return;
+    end
+
+    fprintf('\n%-5s %-10s %-10s %-10s %-12s %-12s %-12s\n', ...
+        'Iter', 'Xl', 'Xu', 'Mid', 'f(Xl)', 'f(Xu)', 'f(Mid)');
+    disp(repmat('-', 1, 70));
+
+    for k = 1:size(log, 1)
+        fprintf('%-5d %-10.5f %-10.5f %-10.5f %-12.3e %-12.3e %-12.3e\n', log(k, :));
+    end
+end
+
+function plot_bisection_results(f, interval, roots)
+    % Plot the function and highlight roots found by Bisection
+    x_vals = linspace(interval(1), interval(2), 1000);
+    y_vals = arrayfun(f, x_vals);
+
+    figure;
+    hold on;
+
+    plot(x_vals, y_vals, 'b-', 'LineWidth', 2, 'DisplayName', 'f(x)');
+    plot([interval(1), interval(2)], [0, 0], 'k--', 'DisplayName', 'y = 0');
+
+    for i = 1:length(roots)
+        plot(roots(i), f(roots(i)), 'ro', 'MarkerSize', 8, ...
+            'MarkerFaceColor', 'r', 'DisplayName', sprintf('Root %.4f', roots(i)));
+        text(roots(i), f(roots(i)), sprintf('%.4f', roots(i)), ...
+            'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center');
+    end
+
+    xlabel('x');
+    ylabel('f(x)');
+    title('Roots Found Using Bisection Method');
+    legend('Location', 'best');
+    grid on;
+    hold off;
+end
