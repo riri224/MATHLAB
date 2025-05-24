@@ -1,0 +1,130 @@
+function roots = secant_roots(f, x_range)
+    % Method configuration
+    tolerance = 1e-5;
+    step_size = 0.5;
+    max_iterations = 100;
+
+    fprintf('Secant Method Configuration:\n');
+    fprintf('Interval: [%.4f, %.4f] | Step Size: %.2f | Tolerance: %.1e\n\n', ...
+        x_range(1), x_range(2), step_size, tolerance);
+
+    % Execute root finding across the interval
+    [roots, iteration_logs] = find_secant_roots(f, x_range, step_size, tolerance, max_iterations);
+
+    % Display results
+    if isempty(roots)
+        fprintf('No roots located in the specified interval.\n\n');
+    else
+        fprintf('Discovered Approximate Root(s):\n');
+        for i = 1:length(roots)
+            fprintf('Root #%d: %.6f\n', i, roots(i));
+        end
+        fprintf('\n');
+    end
+
+    % Display iteration details
+    fprintf('Secant Method Iteration Log\n');
+    fprintf('%10s %10s %10s %10s %10s %12s %12s %10s %15s\n', ...
+        'Init x0', 'Init x1', 'Iter', 'x0', 'x1', 'f(x0)', 'f(x1)', 'x2', 'Rel. Error (%)');
+
+    for i = 1:size(iteration_logs, 1)
+        entry = iteration_logs(i, :);
+        error_str = '–';
+        if ~isnan(entry{9})
+            error_str = sprintf('%.6f', entry{9});
+        end
+        fprintf('%10.6f %10.6f %10d %10.6f %10.6f %12.6f %12.6f %10.6f %15s\n', ...
+            entry{1}, entry{2}, entry{3}, entry{4}, entry{5}, entry{6}, ...
+            entry{7}, entry{8}, error_str);
+    end
+
+    % Plot function and roots
+    figure;
+    X = linspace(x_range(1), x_range(2), 500);
+    Y = arrayfun(f, X);
+    plot(X, Y, 'b-', 'LineWidth', 2);
+    hold on;
+
+    % Draw horizontal line at y = 0
+    plot(xlim, [0 0], '--', 'Color', [0.5 0.5 0.5], 'LineWidth', 1);
+
+    color_map = lines(length(roots));
+    for i = 1:length(roots)
+        root_x = roots(i);
+        root_y = f(root_x);
+        plot(root_x, root_y, 'o', 'MarkerSize', 10, ...
+            'MarkerEdgeColor', 'k', ...
+            'MarkerFaceColor', color_map(i,:), ...
+            'DisplayName', sprintf('Root %d: %.6f', i, root_x));
+        text(root_x, root_y + 0.05, sprintf('%.6f', root_x), ...
+            'HorizontalAlignment', 'center', 'FontSize', 9, ...
+            'Color', color_map(i,:));
+    end
+
+    title('Root(s) Found Using Secant Method');
+    xlabel('x');
+    ylabel('f(x)');
+    legend('Location', 'best');
+    grid on;
+end
+
+function [roots, all_logs] = find_secant_roots(f, x_range, step, tol, max_iter)
+    roots = [];
+    all_logs = {};
+    x_points = x_range(1):step:x_range(2);
+
+    for i = 1:length(x_points) - 1
+        x0 = x_points(i);
+        x1 = x_points(i + 1);
+        [root, log_entries] = run_secant_method(f, x0, x1, tol, max_iter);
+        % Append logs with initial guesses for each attempt
+        for j = 1:size(log_entries, 1)
+            all_logs(end + 1, :) = [{x0, x1}, log_entries(j, :)]; %#ok<AGROW>
+        end
+        if ~isempty(root) && is_new_root(root, roots, tol)
+            roots(end + 1) = root; %#ok<AGROW>
+        end
+    end
+end
+
+function [root, log] = run_secant_method(f, x0, x1, tol, max_iter)
+    log = {};
+    root = [];
+    for iter = 1:max_iter
+        fx0 = f(x0);
+        fx1 = f(x1);
+        if fx1 - fx0 == 0
+            break;
+        end
+
+        x2 = x1 - fx1 * (x1 - x0) / (fx1 - fx0);
+        if x2 ~= 0
+            approx_error = abs((x2 - x1) / x2) * 100;
+        else
+            approx_error = NaN;
+        end
+
+        log(end + 1, :) = {iter, x0, x1, fx0, fx1, x2, approx_error}; %#ok<AGROW>
+
+        if ~isnan(approx_error) && approx_error < tol
+            root = x2;
+            return;
+        end
+
+        x0 = x1;
+        x1 = x2;
+    end
+
+    if ~isempty(log)
+        root = log{end, 6};  % Return last computed x2
+    end
+end
+
+function is_unique = is_new_root(root, roots, tol)
+    if isempty(roots)
+        is_unique = true;
+        return;
+    end
+    differences = abs(root - roots);
+    is_unique = all(differences > tol);
+end
