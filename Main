@@ -1,0 +1,99 @@
+clear; clc;
+
+disp('=== MATLAB ROOT FINDER TOOL ===');
+
+% --- Step 1: Prompt user for a function f(x) ---
+func_input = input('Enter a function f(x) (e.g. sin(x) - x/2): ', 's');
+f = str2func(['@(x)', func_input]);
+
+% --- Step 2: Validate the entered function ---
+try
+    test_val = f(1); % basic test
+catch
+    error('Error: Invalid function. Please ensure correct MATLAB syntax.');
+end
+
+% --- Step 3: Get interval from user ---
+a = input('Enter the start of the interval: ');
+b = input('Enter the end of the interval: ');
+interval = [a, b];
+
+% --- Step 4: List available methods and get selection ---
+method_list = {
+    'Graphical', 'Incremental Search', 'Bisection', ...
+    'Regula Falsi', 'Newton-Raphson', 'Secant'
+};
+
+fprintf('\nAvailable Methods:\n');
+for i = 1:length(method_list)
+    fprintf('%d. %s\n', i, method_list{i});
+end
+
+chosen_methods = input('Enter method numbers (e.g. [2 3 5]): ');
+
+% --- Step 5: Prepare derivative if Newton-Raphson is selected ---
+df = @(x) NaN; % default placeholder
+
+if any(chosen_methods == 5)
+    try
+        % Clean up the function string for symbolic differentiation
+        clean_str = strrep(func_input, '.^', '^');
+        clean_str = strrep(clean_str, '.*', '*');
+        clean_str = strrep(clean_str, './', '/');
+
+        syms x;
+        fx = str2sym(clean_str);
+        dfx = diff(fx, x);
+        df = matlabFunction(dfx); % convert to function handle
+
+        fprintf('Computed derivative: df(x) = %s\n', char(dfx));
+    catch
+        warning('Automatic differentiation failed. Enter derivative manually.');
+        df_input = input('Enter derivative df(x): ', 's');
+        try
+            df = str2func(['@(x)', df_input]);
+            df(1); % validate
+        catch
+            df = @(x) NaN;
+            warning('Invalid manual derivative. Newton-Raphson may not work properly.');
+        end
+    end
+end
+
+% --- Step 6: Run selected root-finding methods ---
+disp(' ');
+disp('Running selected methods...');
+for i = 1:length(chosen_methods)
+    method_id = chosen_methods(i);
+    if method_id < 1 || method_id > length(method_list)
+        fprintf('Invalid selection: %d. Skipping.\n', method_id);
+        continue;
+    end
+
+    method_name = method_list{method_id};
+    fprintf('\n--- Running %s Method ---\n', method_name);
+
+    try
+        switch method_name
+            case 'Graphical'
+                graphical_roots(f, interval);
+            case 'Incremental Search'
+                incremental_roots(f, interval);
+            case 'Bisection'
+                bisection_roots(f, interval);
+            case 'Regula Falsi'
+                regula_falsi_roots(f, interval);
+            case 'Newton-Raphson'
+                newton_raphson_roots(f, df, interval);
+            case 'Secant'
+                secant_roots(f, interval);
+        end
+    catch err
+        fprintf('An error occurred in %s: %s\n', method_name, err.message);
+    end
+end
+
+% --- Step 7: End program ---
+disp(' ');
+disp('All selected root-finding methods executed.');
+disp('Thank you for using the MATLAB Root Finder Tool!');
