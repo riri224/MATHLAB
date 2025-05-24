@@ -1,0 +1,82 @@
+function incremental_roots(f, x_range)
+    % INCREMENTAL SEARCH ROOT FINDER
+    % ------------------------------------------
+    % Applies the incremental method to locate approximate roots
+    % within a given interval by scanning in small steps.
+
+    step_size = 0.001;
+    [roots_found, steps_log] = incremental_search(f, x_range, step_size);
+
+    % --- Result Summary ---
+    fprintf('\n--- INCREMENTAL SEARCH REPORT ---\n');
+    if isempty(roots_found)
+        fprintf('No roots detected in [%.4f, %.4f].\n', x_range(1), x_range(2));
+    else
+        fprintf('%d root(s) identified within [%.4f, %.4f] using step size %.4f\n', ...
+            length(roots_found), x_range(1), x_range(2), step_size);
+        fprintf('Roots Found: ');
+        fprintf('%.5f  ', roots_found);
+        fprintf('\n');
+    end
+
+    % --- Log Table Display ---
+    if ~isempty(steps_log)
+        headers = {'Index', 'StartX', 'StepSize', 'EndX', 'f(StartX)', 'f(EndX)', 'Product', 'Status'};
+        step_table = cell2table(steps_log, 'VariableNames', headers);
+        disp('Step-by-Step Computation Log:');
+        disp(step_table);
+    end
+
+    % --- Function Plot ---
+    figure;
+    x_vals = linspace(x_range(1), x_range(2), 1000);
+    y_vals = arrayfun(f, x_vals);
+
+    plot(x_vals, y_vals, 'r-', 'LineWidth', 2); hold on;
+    plot(x_vals, zeros(size(x_vals)), 'k--'); % x-axis line
+
+    color_palette = lines(max(length(roots_found), 1));
+    for i = 1:length(roots_found)
+        plot(roots_found(i), f(roots_found(i)), 'o', ...
+            'MarkerSize', 8, 'MarkerFaceColor', color_palette(i,:), ...
+            'DisplayName', sprintf('Root %d: %.4f', i, roots_found(i)));
+    end
+
+    title('Incremental Method: Root Approximation');
+    xlabel('x'); ylabel('f(x)');
+    if ~isempty(roots_found)
+        legend('show');
+    end
+    grid on;
+end
+
+% ---------------- Subfunction ---------------- %
+function [roots, log] = incremental_search(f, interval, step)
+    % Scans through the interval and checks for sign changes
+    % to detect root-containing subintervals
+
+    x_start = interval(1);
+    x_end = interval(2);
+    roots = [];
+    log = {};
+    entry = 1;
+
+    while x_start < x_end
+        fx1 = f(x_start);
+        x_next = min(x_start + step, x_end);
+        fx2 = f(x_next);
+        status = 'No sign change';
+
+        if fx1 * fx2 < 0
+            approx_root = (x_start + x_next) / 2;
+            if isempty(roots) || all(abs(approx_root - roots) > step/2)
+                roots(end+1) = approx_root;
+                status = 'Root Detected';
+            end
+        end
+
+        log{end+1, :} = {entry, x_start, step, x_next, fx1, fx2, fx1 * fx2, status};
+        x_start = x_start + step;
+        entry = entry + 1;
+    end
+end
