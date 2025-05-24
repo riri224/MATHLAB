@@ -1,0 +1,134 @@
+function regula_falsi_roots(f, x_range)
+    % REGULA FALSI ROOT FINDER (Self-contained and Refined)
+    % Applies the Regula Falsi method over subintervals to find roots.
+
+    % --- Configuration ---
+    step_size = 0.5;
+    tolerance = 1e-5;
+    max_iterations = 100;
+
+    % --- Root Detection ---
+    [roots_found, iteration_log] = search_regula_falsi(f, x_range, step_size, tolerance, max_iterations);
+
+    % --- Result Summary ---
+    fprintf('\n--- REGULA FALSI METHOD CONFIGURATION ---\n');
+    fprintf('Interval: [%.4f, %.4f] | Step Size: %.2f | Tolerance: %.1e\n', ...
+        x_range(1), x_range(2), step_size, tolerance);
+
+    if isempty(roots_found)
+        fprintf('No roots found in the specified interval.\n');
+    else
+        fprintf('\nRoots Detected:\n');
+        for i = 1:length(roots_found)
+            fprintf('Root %d: %.6f\n', i, roots_found(i));
+        end
+    end
+
+    % --- Display Iteration Table ---
+    fprintf('\n--- FULL ITERATION LOG ---\n');
+    fprintf('%8s %10s %10s %10s %10s %15s %10s %10s %10s %15s\n', ...
+        'Bracket', 'Iter', 'Xl', 'Xu', 'Xr', 'Error (%)', ...
+        'f(Xl)', 'f(Xu)', 'f(Xr)', 'f(Xl)*f(Xr)');
+
+    for i = 1:length(iteration_log)
+        row = iteration_log{i};
+        error_str = isnan(row{6}) ? '–' : sprintf('%.6f', row{6});
+
+        fprintf('%8d %10d %10.6f %10.6f %10.6f %15s %10.6f %10.6f %10.6f %15.6f\n', ...
+            row{1}, row{2}, row{3}, row{4}, row{5}, error_str, ...
+            row{7}, row{8}, row{9}, row{10});
+    end
+
+    % --- Plotting ---
+    X = linspace(x_range(1), x_range(2), 500);
+    Y = arrayfun(f, X);
+
+    figure;
+    plot(X, Y, 'g-', 'LineWidth', 2); hold on;
+    plot(xlim, [0 0], '--', 'Color', [0.6 0.6 0.6], 'LineWidth', 1);
+
+    color_map = lines(length(roots_found));
+    for i = 1:length(roots_found)
+        rx = roots_found(i);
+        ry = f(rx);
+        plot(rx, ry, 'o', 'MarkerSize', 10, ...
+            'MarkerEdgeColor', 'k', ...
+            'MarkerFaceColor', color_map(i,:), ...
+            'DisplayName', sprintf('Root %d: %.6f', i, rx));
+        text(rx, ry + 0.05, sprintf('%.6f', rx), ...
+            'HorizontalAlignment', 'center', ...
+            'FontSize', 9, ...
+            'Color', color_map(i,:));
+    end
+
+    title('Function Plot - Regula Falsi Method', 'FontWeight', 'bold');
+    xlabel('x');
+    ylabel('f(x)');
+    legend('Location', 'best');
+    grid on;
+end
+
+% --- Finds Roots by Scanning Brackets ---
+function [roots, log_data] = search_regula_falsi(f, range, step, tol, max_iter)
+    a = range(1);
+    b = range(2);
+    roots = [];
+    log_data = {};
+    bracket = 1;
+
+    while a < b
+        x1 = a;
+        x2 = min(a + step, b);
+        f1 = f(x1);
+        f2 = f(x2);
+
+        if f1 * f2 < 0 || abs(f1) < tol || abs(f2) < tol
+            [new_roots, new_log] = regula_falsi_core(f, x1, x2, tol, max_iter, bracket);
+            log_data = [log_data; new_log]; %#ok<AGROW>
+            for r = new_roots
+                if isempty(roots) || all(abs(r - roots) > tol)
+                    roots(end+1) = r; %#ok<AGROW>
+                end
+            end
+        end
+
+        a = a + step;
+        bracket = bracket + 1;
+    end
+end
+
+% --- Performs Regula Falsi on One Interval ---
+function [roots, log_rows] = regula_falsi_core(f, a, b, tol, max_iter, bracket_id)
+    fa = f(a); fb = f(b);
+    roots = [];
+    log_rows = {};
+    prev_xr = NaN;
+    iter = 1;
+
+    if fa * fb > 0, return; end
+
+    while iter <= max_iter
+        denom = fb - fa;
+        if denom == 0, break; end
+
+        xr = b - fb * (b - a) / denom;
+        fr = f(xr);
+        ea = isnan(prev_xr) ? NaN : abs((xr - prev_xr) / xr) * 100;
+
+        log_rows{end+1} = {bracket_id, iter, a, b, xr, ea, fa, fb, fr, fa * fr};
+
+        if abs(fr) < tol || (~isnan(ea) && ea < tol)
+            roots = [roots, xr];
+            break;
+        end
+
+        if fa * fr < 0
+            b = xr; fb = fr;
+        else
+            a = xr; fa = fr;
+        end
+
+        prev_xr = xr;
+        iter = iter + 1;
+    end
+end
