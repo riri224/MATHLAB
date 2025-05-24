@@ -1,0 +1,122 @@
+function roots = newton_raphson_roots(f, df, x_range)
+    % Settings
+    tolerance = 1e-5;
+    increment = 0.5;
+    max_iterations = 100;
+
+    % Display configuration info
+    fprintf('Search Interval: [%.2f, %.2f] | Step Size: %.2f | Tolerance: %.1e\n', ...
+        x_range(1), x_range(2), increment, tolerance);
+
+    % Find all roots within the interval
+    [roots, iteration_data] = find_all_newton_roots(f, df, x_range, increment, tolerance, max_iterations);
+
+    % Output roots
+    if isempty(roots)
+        fprintf('No roots were detected.\n');
+    else
+        fprintf('Total Roots Found: %d\n', length(roots));
+        for i = 1:length(roots)
+            fprintf('Root #%d: %.6f\n', i, roots(i));
+        end
+        fprintf('\n');
+    end
+
+    % Plot the function and roots
+    X = linspace(x_range(1), x_range(2), 500);
+    Y = arrayfun(f, X);
+
+    figure;
+    hold on;
+    plot(X, Y, 'b-', 'LineWidth', 2);
+    plot([x_range(1), x_range(2)], [0, 0], 'k--');
+
+    colors = lines(length(roots));
+    for i = 1:length(roots)
+        r = roots(i);
+        y_val = f(r);
+        plot(r, y_val, 'o', 'MarkerSize', 8, ...
+            'MarkerEdgeColor', colors(i,:), ...
+            'MarkerFaceColor', colors(i,:));
+        text(r, y_val + 0.05, sprintf('%.6f', r), ...
+            'HorizontalAlignment', 'center', ...
+            'Color', colors(i,:), 'FontSize', 9);
+    end
+
+    xlabel('x');
+    ylabel('f(x)');
+    title('Root Visualization using Newton-Raphson');
+    legend_items = [{'f(x)', 'y = 0'}, ...
+                    arrayfun(@(i) sprintf('Root %d: %.5f', i, roots(i)), ...
+                             1:length(roots), 'UniformOutput', false)];
+    legend(legend_items{:}, 'Location', 'best');
+    grid on;
+
+    % Show iteration details
+    if ~isempty(iteration_data)
+        fprintf('\nNewton-Raphson Iteration Log:\n');
+        headers = {'InitialGuess', 'Iteration', 'x0', 'f(x0)', 'f''(x0)', 'x1', 'ApproxRelError'};
+        table_out = array2table(iteration_data, 'VariableNames', headers);
+        disp(table_out);
+    end
+end
+
+function [root, history] = newton_single_root(f, df, initial_guess, tol, max_iter)
+    history = [];
+    x_current = initial_guess;
+
+    for iter = 1:max_iter
+        fx = f(x_current);
+        dfx = df(x_current);
+        if dfx == 0
+            break;
+        end
+
+        x_next = x_current - fx / dfx;
+        if x_next ~= 0
+            error_approx = abs((x_next - x_current) / x_next) * 100;
+        else
+            error_approx = NaN;
+        end
+
+        history = [history; iter, x_current, fx, dfx, x_next, error_approx];
+
+        if ~isnan(error_approx) && error_approx < tol
+            root = x_next;
+            return;
+        end
+
+        x_current = x_next;
+    end
+
+    if ~isempty(history)
+        root = x_next;
+    else
+        root = NaN;
+    end
+end
+
+function [roots_found, all_logs] = find_all_newton_roots(f, df, range, step, tol, max_iter)
+    roots_found = [];
+    all_logs = [];
+
+    for guess = range(1):step:range(2)
+        [root, log] = newton_single_root(f, df, guess, tol, max_iter);
+        if ~isempty(log)
+            guess_col = repmat(guess, size(log, 1), 1);
+            all_logs = [all_logs; [guess_col, log]];
+        end
+        if ~isnan(root) && is_new_root(root, roots_found, tol)
+            roots_found(end + 1) = root; %#ok<AGROW>
+        end
+    end
+end
+
+function is_new = is_new_root(root, existing_roots, tol)
+    if isempty(existing_roots)
+        is_new = true;
+        return;
+    end
+    differences = abs(root - existing_roots);
+    is_new = all(differences > tol);
+end
