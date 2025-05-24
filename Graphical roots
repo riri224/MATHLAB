@@ -1,0 +1,77 @@
+function estimated_roots = graphical_roots(f, range, num_points, threshold)
+    % GRAPHICAL_ROOTS - Estimate roots visually by scanning for sign changes
+    %
+    % f         - Function handle, e.g., @(x) x^2 - 4
+    % range     - Interval to scan, [start, end]
+    % num_points - Number of x values (default: 1000)
+    % threshold - Absolute value near-zero threshold (default: 1e-6)
+
+    % Set defaults
+    if nargin < 3
+        num_points = 1000;
+    end
+    if nargin < 4
+        threshold = 1e-6;
+    end
+
+    % Generate evaluation points
+    x_vals = linspace(range(1), range(2), num_points);
+    y_vals = arrayfun(f, x_vals);
+
+    estimated_roots = [];
+    detection_log = [];
+
+    % Look for zero crossings or points near zero
+    for i = 1:length(x_vals) - 1
+        y_curr = y_vals(i);
+        y_next = y_vals(i + 1);
+
+        if y_curr * y_next < 0
+            midpoint = (x_vals(i) + x_vals(i + 1)) / 2;
+            estimated_roots(end + 1) = midpoint;
+            detection_log(end + 1, :) = [x_vals(i), x_vals(i+1), y_curr, y_next, midpoint];
+        elseif abs(y_curr) < threshold
+            % Avoid very close duplicates
+            if isempty(estimated_roots) || abs(x_vals(i) - estimated_roots(end)) > (range(2) - range(1)) / num_points
+                estimated_roots(end + 1) = x_vals(i);
+                detection_log(end + 1, :) = [x_vals(i), x_vals(i), y_curr, y_curr, x_vals(i)];
+            end
+        end
+    end
+
+    % Print summary
+    fprintf('\nGraphical Method - Root Estimation Summary\n');
+    fprintf('------------------------------------------\n');
+    if isempty(estimated_roots)
+        fprintf('No roots estimated in the range [%.2f, %.2f].\n', range(1), range(2));
+    else
+        fprintf('%d root(s) approximated in range [%.2f, %.2f]:\n', ...
+                length(estimated_roots), range(1), range(2));
+        fprintf('  ');
+        fprintf('%.5f  ', estimated_roots);
+        fprintf('\n');
+    end
+
+    % Visualization
+    figure;
+    plot(x_vals, y_vals, 'b-', 'LineWidth', 2); hold on;
+    plot(x_vals, zeros(size(x_vals)), 'k--'); % y = 0 line
+
+    for k = 1:length(estimated_roots)
+        x_r = estimated_roots(k);
+        y_r = f(x_r);
+        plot(x_r, y_r, 'ro', 'MarkerSize', 8, ...
+             'DisplayName', sprintf('Root %d: %.4f', k, x_r));
+        text(x_r, y_r, sprintf('%.4f', x_r), ...
+             'VerticalAlignment', 'bottom', ...
+             'HorizontalAlignment', 'center', ...
+             'FontSize', 9, 'Color', 'r');
+    end
+
+    title('Graphical Root Detection');
+    xlabel('x');
+    ylabel('f(x)');
+    legend('show');
+    grid on;
+
+end
